@@ -15,7 +15,7 @@ testdata = GTSRB(root='./gtsrb_dataset/',split='train',transform=transforms)
 
 test_dataloader = DataLoader(testdata,shuffle=True)
 
-gtsrbClassifier = torch.jit.load('./models/gtsrb_model.pt').to(device)
+gtsrbClassifier = torch.jit.load('./models/gtsrb_model.pt').eval().to(device)
 
 positives = 0
 with tqdm(desc='calculating Accuracy ...',colour='red',total=len(test_dataloader)) as progress:
