@@ -11,16 +11,16 @@ transforms = Compose([
 ])
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-testdata = GTSRB(root='./gtsrb_dataset/',split='train',transform=transforms)
+testdata = GTSRB(root='./gtsrb_dataset/',split='test',transform=transforms)
 
 test_dataloader = DataLoader(testdata,shuffle=True)
 
 gtsrbClassifier = torch.jit.load('./models/gtsrb_model.pt').eval().to(device)
 
-positives = 0
-with tqdm(desc='calculating Accuracy ...',colour='red',total=len(test_dataloader)) as progress:
+with tqdm(colour='red',total=len(test_dataloader)) as progress:
+  positives = 0
   with torch.no_grad() : 
-    for id,(input,label) in enumerate(iter(test_dataloader)):
+    for id,(input,label) in enumerate(iter(test_dataloader),start=1):
         input = input.to(device)
         label = label.to(device)
         prediction = gtsrbClassifier.forward(input).argmax(1).cpu().numpy()[0]
@@ -28,8 +28,8 @@ with tqdm(desc='calculating Accuracy ...',colour='red',total=len(test_dataloader
         if label == prediction:
             positives += 1
         progress.update(1)
-
-print('Accuracy : ',positives/len(test_dataloader))
+        progress.desc = f"Accuracy : {positives/id}"
+       
 
 '''
     input = input.cpu()

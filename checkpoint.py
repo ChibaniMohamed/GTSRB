@@ -7,7 +7,7 @@ from torch.optim import SGD,Adam
 import tqdm
 
 transforms = Compose([
-    Resize([40,40]),
+    Resize([112,112]),
     ToTensor()
 ])
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -19,7 +19,7 @@ train_loader = DataLoader(dataset=train_dataset,shuffle=True)
 
 EPOCHS = 8
 LEARNING_RATE = 0.001
-INPUT_DIM = 3*40*40
+INPUT_DIM = 3*112*112
 OUTPUT_DIM = 43
 STEPS = len(train_loader)
 model = torch.jit.load('./models/gtsrb_model.pt').to(device)
