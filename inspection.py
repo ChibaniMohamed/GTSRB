@@ -12,10 +12,5 @@ train_loader = DataLoader(train_dataset)
 test_loader = DataLoader(test_dataset)
 
 
-
 print('training data :',len(train_loader))
-
-
-
-
 print('testing data :',len(test_loader))
