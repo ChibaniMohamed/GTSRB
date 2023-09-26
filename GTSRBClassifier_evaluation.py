@@ -19,6 +19,7 @@ gtsrbClassifier = torch.jit.load('./models/gtsrb_model.pt').eval().to(device)
 
 with tqdm(colour='red',total=len(test_dataloader)) as progress:
   positives = 0
+  
   with torch.no_grad() : 
     for id,(input,label) in enumerate(iter(test_dataloader),start=1):
         input = input.to(device)
@@ -28,7 +29,7 @@ with tqdm(colour='red',total=len(test_dataloader)) as progress:
         if label == prediction:
             positives += 1
         progress.update(1)
-        progress.desc = f"Accuracy : {positives/id}"
+        progress.desc = f"Accuracy : {positives/id}, Positives : {positives}, Negatives : {id-positives}"
        
 
 '''

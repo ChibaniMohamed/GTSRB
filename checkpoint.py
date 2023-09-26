@@ -17,7 +17,7 @@ train_loader = DataLoader(dataset=train_dataset,shuffle=True)
 
 
 
-EPOCHS = 8
+EPOCHS = 10
 LEARNING_RATE = 0.001
 INPUT_DIM = 3*112*112
 OUTPUT_DIM = 43
