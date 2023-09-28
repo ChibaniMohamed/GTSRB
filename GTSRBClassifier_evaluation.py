@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 transforms = Compose([
-    Resize([112,112]),
+    Resize([50,50]),
     ToTensor()
 ])
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -15,7 +15,7 @@ testdata = GTSRB(root='./gtsrb_dataset/',split='test',transform=transforms)
 
 test_dataloader = DataLoader(testdata,shuffle=True)
 
-gtsrbClassifier = torch.jit.load('./models/gtsrb_model.pt').eval().to(device)
+gtsrbClassifier = torch.jit.load('./models/gtsrb_model_batch_2.pt').eval().to(device)
 
 with tqdm(colour='red',total=len(test_dataloader)) as progress:
   positives = 0

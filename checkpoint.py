@@ -7,22 +7,22 @@ from torch.optim import SGD,Adam
 import tqdm
 
 transforms = Compose([
-    Resize([112,112]),
+    Resize([50,50]),
     ToTensor()
 ])
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 train_dataset = GTSRB(root='./gtsrb_dataset/',split="train",transform=transforms)
-train_loader = DataLoader(dataset=train_dataset,shuffle=True)
+train_loader = DataLoader(dataset=train_dataset,batch_size=4,shuffle=True)
 
 
 
 EPOCHS = 10
-LEARNING_RATE = 0.001
-INPUT_DIM = 3*112*112
+LEARNING_RATE = 0.00000001
+INPUT_DIM = 3*50*50
 OUTPUT_DIM = 43
 STEPS = len(train_loader)
-model = torch.jit.load('./models/gtsrb_model.pt').to(device)
+model = torch.jit.load('./models/gtsrb_model_batch_2.pt').to(device)
 optimizor = Adam(params=model.parameters(),lr=LEARNING_RATE)
 loss = nn.CrossEntropyLoss()
 try:
@@ -39,8 +39,8 @@ try:
                 optimizor.step()
                 optimizor.zero_grad()
                 STEPS_.colour = 'green'
-                STEPS_.desc = f'Epoch [{epoch}/{EPOCHS}], Step [{step}/{STEPS}], Loss [{"{:.3f}".format(l)}], Accuracy [{"{:.3f}".format(true_pred/step)}]'
+                STEPS_.desc = f'Epoch [{epoch}/{EPOCHS}], Step [{step}/{STEPS}], Loss [{"{:.3f}".format(l)}], Accuracy [{"{:.6f}".format(true_pred/step)}]'
                 STEPS_.update(1)
-    torch.jit.script(model).save('./models/gtsrb_model.pt')
+    torch.jit.script(model).save('./models/gtsrb_model_batch_2.pt')
 except KeyboardInterrupt:
-    torch.jit.script(model).save('./models/gtsrb_model.pt')
+    torch.jit.script(model).save('./models/gtsrb_model_batch_2.pt')
