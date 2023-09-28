@@ -28,6 +28,13 @@ with tqdm(colour='red',total=len(test_dataloader)) as progress:
         label = label.cpu().numpy()
         if label == prediction:
             positives += 1
+        '''
+        else:
+           input = input[0].permute(1,2,0).cpu()
+           plt.title(f'prediction : {prediction}, truth : {label[0]}')
+           plt.imshow(input)
+           plt.show()
+        '''
         progress.update(1)
         progress.desc = f"Accuracy : {positives/id}, Positives : {positives}, Negatives : {id-positives}"
        
