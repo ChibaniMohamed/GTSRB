@@ -1,23 +1,38 @@
 import torch
 import torch.nn as nn
 from torchvision.datasets import GTSRB
-from torch.utils.data import DataLoader
-from torch.optim import SGD,Adam,lr_scheduler
+from torch.utils.data import DataLoader,random_split
+from torch.optim import Adam,lr_scheduler
 from torchvision.transforms import ToTensor,Resize,Compose,RandomAutocontrast,RandomRotation,GaussianBlur
 import matplotlib.pyplot as plt
+import pickle
 import tqdm
-BATCH_SIZE = 32
+BATCH_SIZE = 64
 device = torch.device('cuda' if torch.cuda.is_available else 'cpu')
 transforms = Compose([
     Resize([50,50]),
     RandomAutocontrast(),
     RandomRotation(30),
-    GaussianBlur((5,5)),
+    GaussianBlur((3,3)),
     ToTensor()
 ])
 
-train_dataset = GTSRB(root='./gtsrb_dataset/',split="train",transform=transforms)
-train_loader = DataLoader(dataset=train_dataset,batch_size=BATCH_SIZE,shuffle=True)
+def train_test_split(dataset,train_size):
+
+    train_size = int(train_size * len(dataset))
+    test_size = int(len(dataset) - train_size)
+    return random_split(dataset,[train_size,test_size])
+
+
+dataset = GTSRB(root='./gtsrb_dataset/',split="train",transform=transforms)
+train_set,validation_set = train_test_split(dataset,train_size=0.8)
+
+train_loader = DataLoader(dataset=train_set,batch_size=BATCH_SIZE,shuffle=True)
+validation_loader = DataLoader(dataset=validation_set,batch_size=BATCH_SIZE,shuffle=True)
+
+
+
+
 
 
 class GTSRB_NETWORK(nn.Module):
@@ -78,42 +93,115 @@ class GTSRB_NETWORK(nn.Module):
        
         return output
     
+    def training_metrics(self,positives,loss):
+        data_size = len(train_loader)
+        acc = positives/data_size
+        return loss,acc
+    
+    def validation_metrics(self,validation_data,loss_function):
+       data_size = len(validation_data)
+       positives = 0
+       val_loss = 0
+
+       model = self.eval()
+       with torch.no_grad() : 
+        for step,(input,label) in enumerate(validation_data,start=1):
+            input,label = input.to(device),label.to(device)
+            prediction = model.forward(input)
+            loss = loss_function(prediction,label)
+            val_loss = "{:.4f}".format(loss)
+            if prediction.argmax(1)[0] == label[0] :
+                positives += 1
+       
+       val_acc = positives/data_size
+
+       return val_loss,val_acc
+
+    def save_metrics(output,filename,metrics_dict):
+
+            
+            with open(f"{output}/{filename}.pkl",'wb') as f:
+                pickle.dump(metrics_dict,f)
+                print('metrics saved !')
+
+
+    def compile(self,train_data,validation_data,epochs,loss_function,optimizer,learning_rate_scheduler):
+        val_acc_list = []
+        val_loss_list = []
+
+        train_acc_list = []
+        train_loss_list = []
+
+        learning_rate_list = []
+
+        print('training started ...')
+        STEPS = len(train_data)
+        for epoch in range(epochs):
+            lr = optimizer.param_groups[0]["lr"]
+            learning_rate_list.append(lr)
+            positives = 0
+            loss = 0
+            with tqdm.trange(STEPS) as STEPS_:
+
+                for step,(input,label) in enumerate(train_loader,start=1):
+
+                    input,label = input.to(device),label.to(device)
+                    prediction = self.forward(input)
+
+                    if prediction.argmax(1)[0] == label[0] :
+                        positives += 1
+
+                    l = loss_function(prediction,label)
+                    loss = "{:.4f}".format(l)
+                    l.backward()
+                    optimizer.step()
+                    optimizer.zero_grad()
+
+                    STEPS_.colour = 'green'
+                    STEPS_.desc = f'Epoch [{epoch}/{EPOCHS}], Step [{step}/{STEPS}], Learning Rate [{lr}], Loss [{"{:.3f}".format(l)}], Accuracy [{"{:.3f}".format(positives/step)}]'
+                    STEPS_.update(1)
+
+            training_loss,training_acc = self.training_metrics(positives,loss)
+            train_acc_list.append(training_acc)
+            train_loss_list.append(training_loss)
+
+            val_loss, val_acc = self.validation_metrics(validation_data,loss_function)
+            val_acc_list.append(val_acc)
+            val_loss_list.append(val_loss)
+            
+            print(f'val_accuracy [{val_acc}], val_loss [{val_loss}]')
+
+            
+            learning_rate_scheduler.step()
+        
+        metrics_dict = {
+                'train_acc':train_acc_list,
+                'train_loss':train_loss_list,
+                'val_acc':val_acc_list,
+                'val_loss':val_loss_list,
+            }
+        self.save_metrics('./models','gtsrb_model_final_metrics',metrics_dict)
+        print('training complete !')    
+
+        
+         
+
+    
 EPOCHS = 30
 LEARNING_RATE = 0.001
 INPUT_DIM = 3*50*50
 OUTPUT_DIM = 43
-STEPS = len(train_loader)
 model = GTSRB_NETWORK(INPUT_DIM,OUTPUT_DIM).to(device)
 optimizer = Adam(params=model.parameters(),lr=LEARNING_RATE)
 lr_s = lr_scheduler.LinearLR(optimizer,start_factor=1.0,end_factor=0.001,total_iters=10)
 loss = nn.CrossEntropyLoss()
 try:
-    for epoch in range(EPOCHS):
-        true_pred = 0
-        with tqdm.trange(STEPS) as STEPS_:
-            for step,(input,label) in enumerate(train_loader,start=1):
-                input,label = input.to(device),label.to(device)
-                prediction = model.forward(input)
-                if prediction.argmax(1)[0] == label[0] :
-                    true_pred += 1
-                l = loss(prediction,label)
-                l.backward()
-                optimizer.step()
-                optimizer.zero_grad()
-                STEPS_.colour = 'green'
-                STEPS_.desc = f'Epoch [{epoch}/{EPOCHS}], Step [{step}/{STEPS}], Learning Rate [{optimizer.param_groups[0]["lr"]}], Loss [{"{:.3f}".format(l)}], Accuracy [{"{:.3f}".format(true_pred/step)}]'
-                STEPS_.update(1)
-        lr_s.step()
-    torch.jit.script(model).save('./models/gtsrb_model_augmented_lr_scheduler.pt')
-except KeyboardInterrupt:
-    torch.jit.script(model).save('./models/gtsrb_model_augmented_lr_scheduler.pt')
-
-model = model.eval()
-for i,(input,label) in enumerate(train_loader):
+    model.compile(train_data=train_loader,validation_data=validation_loader,epochs=EPOCHS,loss_function=loss,optimizer=optimizer,learning_rate_scheduler=lr_s)
     
-    normalized_input = input[0].permute(1,2,0)
-    prediction = model.forward(input.to(device)).argmax(1)[0]
-    plt.title(f'predicted :{prediction} | ground truth : {label[0]}')
-    plt.imshow(normalized_input)
-    plt.show()
+    torch.jit.script(model).save('./models/gtsrb_model_final.pt')
+except KeyboardInterrupt:
+    torch.jit.script(model).save('./models/gtsrb_model_final.pt')
+
+
+
     
