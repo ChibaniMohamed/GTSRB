@@ -2,15 +2,18 @@ import torch
 import torch.nn as nn
 from torchvision.datasets import GTSRB
 from torch.utils.data import DataLoader
-from torch.optim import SGD,Adam
-from torchvision.transforms import ToTensor,Resize,Compose
+from torch.optim import SGD,Adam,lr_scheduler
+from torchvision.transforms import ToTensor,Resize,Compose,RandomAutocontrast,RandomRotation,GaussianBlur
 import matplotlib.pyplot as plt
 import tqdm
-BATCH_SIZE = 4
+BATCH_SIZE = 32
 device = torch.device('cuda' if torch.cuda.is_available else 'cpu')
 transforms = Compose([
-Resize([50,50]),
-ToTensor()
+    Resize([50,50]),
+    RandomAutocontrast(),
+    RandomRotation(30),
+    GaussianBlur((5,5)),
+    ToTensor()
 ])
 
 train_dataset = GTSRB(root='./gtsrb_dataset/',split="train",transform=transforms)
@@ -54,13 +57,13 @@ class GTSRB_NETWORK(nn.Module):
         
     def forward(self,input):
         
-        conv = self.conv1(input)
-        conv = self.conv2(conv)
+        conv = self.relu(self.conv1(input))
+        conv = self.relu(self.conv2(conv))
         maxpool = self.maxpool1(conv)
         batchnorm = self.batchnorm1(maxpool)
 
-        conv = self.conv3(batchnorm)
-        conv = self.conv4(conv)
+        conv = self.relu(self.conv3(batchnorm))
+        conv = self.relu(self.conv4(conv))
         maxpool = self.maxpool2(conv)
         batchnorm = self.batchnorm2(maxpool)
 
@@ -75,13 +78,14 @@ class GTSRB_NETWORK(nn.Module):
        
         return output
     
-EPOCHS = 8
+EPOCHS = 30
 LEARNING_RATE = 0.001
 INPUT_DIM = 3*50*50
 OUTPUT_DIM = 43
 STEPS = len(train_loader)
 model = GTSRB_NETWORK(INPUT_DIM,OUTPUT_DIM).to(device)
-optimizor = Adam(params=model.parameters(),lr=LEARNING_RATE)
+optimizer = Adam(params=model.parameters(),lr=LEARNING_RATE)
+lr_s = lr_scheduler.LinearLR(optimizer,start_factor=1.0,end_factor=0.001,total_iters=10)
 loss = nn.CrossEntropyLoss()
 try:
     for epoch in range(EPOCHS):
@@ -94,14 +98,15 @@ try:
                     true_pred += 1
                 l = loss(prediction,label)
                 l.backward()
-                optimizor.step()
-                optimizor.zero_grad()
+                optimizer.step()
+                optimizer.zero_grad()
                 STEPS_.colour = 'green'
-                STEPS_.desc = f'Epoch [{epoch}/{EPOCHS}], Step [{step}/{STEPS}], Loss [{"{:.3f}".format(l)}], Accuracy [{"{:.3f}".format(true_pred/step)}]'
+                STEPS_.desc = f'Epoch [{epoch}/{EPOCHS}], Step [{step}/{STEPS}], Learning Rate [{optimizer.param_groups[0]["lr"]}], Loss [{"{:.3f}".format(l)}], Accuracy [{"{:.3f}".format(true_pred/step)}]'
                 STEPS_.update(1)
-    torch.jit.script(model).save('./models/gtsrb_model_batch.pt')
+        lr_s.step()
+    torch.jit.script(model).save('./models/gtsrb_model_augmented_lr_scheduler.pt')
 except KeyboardInterrupt:
-    torch.jit.script(model).save('./models/gtsrb_model_batch.pt')
+    torch.jit.script(model).save('./models/gtsrb_model_augmented_lr_scheduler.pt')
 
 model = model.eval()
 for i,(input,label) in enumerate(train_loader):
