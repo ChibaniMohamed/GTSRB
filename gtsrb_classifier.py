@@ -3,18 +3,23 @@ import torch.nn as nn
 from torchvision.datasets import GTSRB
 from torch.utils.data import DataLoader,random_split
 from torch.optim import Adam,lr_scheduler
-from torchvision.transforms import ToTensor,Resize,Compose,RandomAutocontrast,RandomRotation,GaussianBlur
+from torchvision.transforms import ToTensor,Resize,Compose,ColorJitter,RandomRotation,Normalize
 import matplotlib.pyplot as plt
 import pickle
 import tqdm
 BATCH_SIZE = 64
 device = torch.device('cuda' if torch.cuda.is_available else 'cpu')
-transforms = Compose([
+train_transforms = Compose([
+    RandomRotation(15),
+    ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
     Resize([50,50]),
-    RandomAutocontrast(),
-    RandomRotation(30),
-    GaussianBlur((3,3)),
-    ToTensor()
+    ToTensor(),
+    Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
+validation_transforms =  Compose([
+    Resize([50,50]),
+    ToTensor(),
+    Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
 
 def train_test_split(dataset,train_size):
@@ -24,11 +29,15 @@ def train_test_split(dataset,train_size):
     return random_split(dataset,[train_size,test_size])
 
 
-dataset = GTSRB(root='./gtsrb_dataset/',split="train",transform=transforms)
-train_set,validation_set = train_test_split(dataset,train_size=0.8)
+dataset = GTSRB(root='./gtsrb_dataset/',split="train")
+train_set,validation_set = train_test_split(dataset,train_size=0.7)
 
+train_set.dataset.transform = train_transforms
+validation_set.dataset.transform = validation_transforms
+
+print(f'training size : {len(train_set)}, Validation size : {len(validation_set)}')
 train_loader = DataLoader(dataset=train_set,batch_size=BATCH_SIZE,shuffle=True)
-validation_loader = DataLoader(dataset=validation_set,batch_size=BATCH_SIZE,shuffle=True)
+validation_loader = DataLoader(dataset=validation_set,batch_size=BATCH_SIZE)
 
 
 
@@ -109,7 +118,7 @@ class GTSRB_NETWORK(nn.Module):
             input,label = input.to(device),label.to(device)
             prediction = model.forward(input)
             loss = loss_function(prediction,label)
-            val_loss = "{:.4f}".format(loss)
+            val_loss = loss.item()
             if prediction.argmax(1)[0] == label[0] :
                 positives += 1
        
@@ -117,7 +126,7 @@ class GTSRB_NETWORK(nn.Module):
 
        return val_loss,val_acc
 
-    def save_metrics(output,filename,metrics_dict):
+    def save_metrics(self,output,filename,metrics_dict):
 
             
             with open(f"{output}/{filename}.pkl",'wb') as f:
@@ -152,13 +161,13 @@ class GTSRB_NETWORK(nn.Module):
                         positives += 1
 
                     l = loss_function(prediction,label)
-                    loss = "{:.4f}".format(l)
+                    loss = l.item()
                     l.backward()
                     optimizer.step()
                     optimizer.zero_grad()
 
                     STEPS_.colour = 'green'
-                    STEPS_.desc = f'Epoch [{epoch}/{EPOCHS}], Step [{step}/{STEPS}], Learning Rate [{lr}], Loss [{"{:.3f}".format(l)}], Accuracy [{"{:.3f}".format(positives/step)}]'
+                    STEPS_.desc = f'Epoch [{epoch}/{EPOCHS}], Step [{step}/{STEPS}], Learning Rate [{lr}], Loss [{"{:.4f}".format(l)}], Accuracy [{"{:.4f}".format(positives/step)}]'
                     STEPS_.update(1)
 
             training_loss,training_acc = self.training_metrics(positives,loss)
@@ -179,6 +188,7 @@ class GTSRB_NETWORK(nn.Module):
                 'train_loss':train_loss_list,
                 'val_acc':val_acc_list,
                 'val_loss':val_loss_list,
+                'learning_rate':optimizer.param_groups[0]["lr"]
             }
         self.save_metrics('./models','gtsrb_model_final_metrics',metrics_dict)
         print('training complete !')    

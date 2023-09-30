@@ -1,19 +1,22 @@
 import torch
 from torchvision.datasets import GTSRB
-from torchvision.transforms import Resize,ToTensor,Compose
+from torchvision.transforms import Resize,ToTensor,Compose,Normalize,RandomAutocontrast,RandomRotation,GaussianBlur
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 transforms = Compose([
     Resize([50,50]),
-    ToTensor()
+   
+    ToTensor(),
+    Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 testdata = GTSRB(root='./gtsrb_dataset/',split='test',transform=transforms)
+print('testing size :',len(testdata))
+test_dataloader = DataLoader(testdata)
 
-test_dataloader = DataLoader(testdata,shuffle=True)
 
 gtsrbClassifier = torch.jit.load('./models/gtsrb_model_final.pt').eval().to(device)
 

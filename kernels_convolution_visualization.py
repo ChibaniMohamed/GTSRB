@@ -1,15 +1,14 @@
 import torch 
 import torch.nn as nn
 from torchvision.datasets import GTSRB
-from torchvision.transforms import Compose,ToTensor,Resize,Normalize,RandomAutocontrast,GaussianBlur,RandomRotation
+from torchvision.transforms import Compose,ToTensor,Resize,Normalize,RandomRotation,ColorJitter,RandomHorizontalFlip
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 
 transforms = Compose([
-    Resize([40,40]),
-    RandomAutocontrast(),
-    RandomRotation(30),
-    GaussianBlur((5,5)),
+    Resize([50,50]),
+    RandomRotation(15),
+    ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
     ToTensor(),
     
 ])
