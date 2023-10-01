@@ -1,5 +1,5 @@
 import torch
-from torchvision.datasets import GTSRB
+from GTSRB import GTSRB
 from torchvision.transforms import Resize,ToTensor,Compose,Normalize,RandomAutocontrast,RandomRotation,GaussianBlur
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
@@ -9,11 +9,11 @@ transforms = Compose([
     Resize([50,50]),
    
     ToTensor(),
-    Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    
 ])
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-testdata = GTSRB(root='./gtsrb_dataset/',split='test',transform=transforms)
+testdata = GTSRB(root='./archive',split='test',transform=transforms)
 print('testing size :',len(testdata))
 test_dataloader = DataLoader(testdata)
 
@@ -31,13 +31,13 @@ with tqdm(colour='red',total=len(test_dataloader)) as progress:
         label = label.cpu().numpy()
         if label == prediction:
             positives += 1
-        '''
+        
         else:
            input = input[0].permute(1,2,0).cpu()
            plt.title(f'prediction : {prediction}, truth : {label[0]}')
            plt.imshow(input)
            plt.show()
-        '''
+        
         progress.update(1)
         progress.desc = f"Accuracy : {positives/id}, Positives : {positives}, Negatives : {id-positives}"
        

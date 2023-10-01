@@ -1,25 +1,28 @@
 import torch
 import torch.nn as nn
-from torchvision.datasets import GTSRB
+from GTSRB import GTSRB
 from torch.utils.data import DataLoader,random_split
 from torch.optim import Adam,lr_scheduler
-from torchvision.transforms import ToTensor,Resize,Compose,ColorJitter,RandomRotation,Normalize
+from torchvision.transforms import ToTensor,Resize,Compose,ColorJitter,RandomRotation,Normalize,GaussianBlur
 import matplotlib.pyplot as plt
 import pickle
 import tqdm
 BATCH_SIZE = 64
 device = torch.device('cuda' if torch.cuda.is_available else 'cpu')
+#reduce batch
 train_transforms = Compose([
-    RandomRotation(15),
-    ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+    GaussianBlur((3,3)),
+    RandomRotation(30),
+    
+    ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.2),
     Resize([50,50]),
     ToTensor(),
-    Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    
 ])
 validation_transforms =  Compose([
     Resize([50,50]),
     ToTensor(),
-    Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    
 ])
 
 def train_test_split(dataset,train_size):
@@ -29,7 +32,7 @@ def train_test_split(dataset,train_size):
     return random_split(dataset,[train_size,test_size])
 
 
-dataset = GTSRB(root='./gtsrb_dataset/',split="train")
+dataset = GTSRB(root='./archive',split="train")
 train_set,validation_set = train_test_split(dataset,train_size=0.7)
 
 train_set.dataset.transform = train_transforms
@@ -62,18 +65,17 @@ class GTSRB_NETWORK(nn.Module):
 
 
         self.conv1 = nn.Conv2d(3,16,3)
-        self.conv2 = nn.Conv2d(in_channels=16,out_channels=32,kernel_size=3)
         self.maxpool1 = nn.MaxPool2d(2)
-        self.batchnorm1 = nn.BatchNorm2d(32)
+        self.batchnorm1 = nn.BatchNorm2d(16)
 
-        self.conv3 =  nn.Conv2d(in_channels=32,out_channels=64,kernel_size=3)
+        self.conv3 =  nn.Conv2d(in_channels=16,out_channels=64,kernel_size=3)
         self.conv4 = nn.Conv2d(in_channels=64,out_channels=128,kernel_size=3)
         self.maxpool2 = nn.MaxPool2d(2)
         self.batchnorm2 = nn.BatchNorm2d(128)
 
        
 
-        self.l1 = nn.Linear(128*9*9,245)
+        self.l1 = nn.Linear(128*10*10,245)
         
         self.l2 = nn.Linear(245,128)
         self.l3 = nn.Linear(128,output_dim)
@@ -82,7 +84,7 @@ class GTSRB_NETWORK(nn.Module):
     def forward(self,input):
         
         conv = self.relu(self.conv1(input))
-        conv = self.relu(self.conv2(conv))
+        
         maxpool = self.maxpool1(conv)
         batchnorm = self.batchnorm1(maxpool)
 
@@ -92,12 +94,13 @@ class GTSRB_NETWORK(nn.Module):
         batchnorm = self.batchnorm2(maxpool)
 
        
-
+      
         flatten = self.flatten(batchnorm)
         
         dense_l1 = self.l1(flatten)
         dense_l2 = self.l2(dense_l1)
-        output = self.l3(dense_l2)
+        dropout = self.dropout(dense_l2)
+        output = self.l3(dropout)
         
        
         return output
@@ -197,7 +200,7 @@ class GTSRB_NETWORK(nn.Module):
          
 
     
-EPOCHS = 30
+EPOCHS = 15
 LEARNING_RATE = 0.001
 INPUT_DIM = 3*50*50
 OUTPUT_DIM = 43
