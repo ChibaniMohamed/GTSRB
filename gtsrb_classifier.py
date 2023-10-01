@@ -9,7 +9,7 @@ import pickle
 import tqdm
 BATCH_SIZE = 64
 device = torch.device('cuda' if torch.cuda.is_available else 'cpu')
-#reduce batch
+
 train_transforms = Compose([
     GaussianBlur((3,3)),
     RandomRotation(30),
@@ -76,8 +76,8 @@ class GTSRB_NETWORK(nn.Module):
        
 
         self.l1 = nn.Linear(128*10*10,245)
-        
         self.l2 = nn.Linear(245,128)
+        self.batchnorm3 = nn.LayerNorm(128)
         self.l3 = nn.Linear(128,output_dim)
         
         
@@ -99,7 +99,9 @@ class GTSRB_NETWORK(nn.Module):
         
         dense_l1 = self.l1(flatten)
         dense_l2 = self.l2(dense_l1)
-        dropout = self.dropout(dense_l2)
+        batchnorm = self.batchnorm3(dense_l2)
+        #more dense and batchnorm layers
+        dropout = self.dropout(batchnorm)
         output = self.l3(dropout)
         
        

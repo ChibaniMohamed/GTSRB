@@ -1,13 +1,13 @@
 import torch
 from GTSRB import GTSRB
-from torchvision.transforms import Resize,ToTensor,Compose,Normalize,RandomAutocontrast,RandomRotation,GaussianBlur
+from torchvision.transforms import Resize,ToTensor,Compose,Normalize,RandomAutocontrast,RandomRotation,GaussianBlur,ColorJitter
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 transforms = Compose([
-    Resize([50,50]),
    
+    Resize([50,50]),
     ToTensor(),
     
 ])
@@ -31,13 +31,13 @@ with tqdm(colour='red',total=len(test_dataloader)) as progress:
         label = label.cpu().numpy()
         if label == prediction:
             positives += 1
-        
+        '''
         else:
            input = input[0].permute(1,2,0).cpu()
            plt.title(f'prediction : {prediction}, truth : {label[0]}')
            plt.imshow(input)
            plt.show()
-        
+        '''
         progress.update(1)
         progress.desc = f"Accuracy : {positives/id}, Positives : {positives}, Negatives : {id-positives}"
        
