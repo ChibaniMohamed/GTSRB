@@ -3,7 +3,7 @@ import torch.nn as nn
 from GTSRB import GTSRB
 from torch.utils.data import DataLoader,random_split
 from torch.optim import Adam,lr_scheduler
-from torchvision.transforms import ToTensor,Resize,Compose,ColorJitter,RandomRotation,Normalize,GaussianBlur
+from torchvision.transforms import ToTensor,Resize,Compose,ColorJitter,RandomRotation,Pad,RandomCrop,GaussianBlur
 import matplotlib.pyplot as plt
 import pickle
 import tqdm
@@ -15,6 +15,8 @@ train_transforms = Compose([
     RandomRotation(30),
     
     ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.2),
+
+
     Resize([50,50]),
     ToTensor(),
     
@@ -64,43 +66,55 @@ class GTSRB_NETWORK(nn.Module):
         self.leakyRelu = nn.LeakyReLU()
 
 
-        self.conv1 = nn.Conv2d(3,16,3)
-        self.maxpool1 = nn.MaxPool2d(2)
-        self.batchnorm1 = nn.BatchNorm2d(16)
+        self.conv1 = nn.Conv2d(in_channels=3,out_channels=16,kernel_size=3)
+        self.conv2 = nn.Conv2d(in_channels=16,out_channels=24,kernel_size=3)
+        self.batchnorm1 = nn.BatchNorm2d(24)
 
-        self.conv3 =  nn.Conv2d(in_channels=16,out_channels=64,kernel_size=3)
+        self.conv3 = nn.Conv2d(in_channels=24,out_channels=64,kernel_size=3)
         self.conv4 = nn.Conv2d(in_channels=64,out_channels=128,kernel_size=3)
-        self.maxpool2 = nn.MaxPool2d(2)
         self.batchnorm2 = nn.BatchNorm2d(128)
 
-       
+        self.conv5 = nn.Conv2d(in_channels=128,out_channels=245,kernel_size=3)
+        self.conv6 = nn.Conv2d(in_channels=245,out_channels=450,kernel_size=3)
+        self.batchnorm3 = nn.BatchNorm2d(450)
 
-        self.l1 = nn.Linear(128*10*10,245)
+        '''
+        self.conv7 =  nn.Conv2d(in_channels=16,out_channels=64,kernel_size=3)
+        self.conv8 = nn.Conv2d(in_channels=64,out_channels=128,kernel_size=3)
+        self.maxpool2 = nn.MaxPool2d(2)
+        self.batchnorm2 = nn.BatchNorm2d(128)
+        '''
+       
+        self.avgpool = nn.AvgPool2d(3)
+
+        self.l1 = nn.Linear(450*12*12,245)
         self.l2 = nn.Linear(245,128)
-        self.batchnorm3 = nn.LayerNorm(128)
+        self.batchnorm4 = nn.LayerNorm(128)
         self.l3 = nn.Linear(128,output_dim)
         
         
     def forward(self,input):
         
-        conv = self.relu(self.conv1(input))
-        
-        maxpool = self.maxpool1(conv)
-        batchnorm = self.batchnorm1(maxpool)
+        conv = self.conv1(input)
+        conv = self.conv2(conv)
+        batchnorm = self.relu(self.batchnorm1(conv))
 
-        conv = self.relu(self.conv3(batchnorm))
-        conv = self.relu(self.conv4(conv))
-        maxpool = self.maxpool2(conv)
-        batchnorm = self.batchnorm2(maxpool)
+        conv = self.conv3(batchnorm)
+        conv = self.conv4(conv)
+        batchnorm = self.relu(self.batchnorm2(conv))
 
-       
-      
-        flatten = self.flatten(batchnorm)
+        conv = self.conv5(batchnorm)
+        conv = self.conv6(conv)
+        batchnorm = self.relu(self.batchnorm3(conv))
+
+        avgpool = self.avgpool(batchnorm)
+
+     
+        flatten = self.flatten(avgpool)
         
         dense_l1 = self.l1(flatten)
         dense_l2 = self.l2(dense_l1)
-        batchnorm = self.batchnorm3(dense_l2)
-        #more dense and batchnorm layers
+        batchnorm = self.batchnorm4(dense_l2)
         dropout = self.dropout(batchnorm)
         output = self.l3(dropout)
         
