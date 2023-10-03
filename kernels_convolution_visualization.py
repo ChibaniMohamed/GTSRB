@@ -1,22 +1,20 @@
 import torch 
 import torch.nn as nn
 from torchvision.datasets import GTSRB
-from torchvision.transforms import Compose,ToTensor,Resize,Normalize,RandomRotation,ColorJitter,RandomHorizontalFlip,Pad
+from torchvision.transforms import Compose,ToTensor,Resize,Normalize,RandomRotation,ColorJitter,RandomHorizontalFlip,Pad,AutoAugment
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 
 transforms = Compose([
+    AutoAugment(),
     Resize([50,50]),
-    Pad(padding=[1,2,3,4]),
-    RandomRotation(15),
-    ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
     ToTensor(),
     
 ])
 
 train_dataset = GTSRB(root='./gtsrb_dataset/',split='train',transform=transforms)
 
-train_dataloader = DataLoader(dataset=train_dataset,shuffle=False)
+train_dataloader = DataLoader(dataset=train_dataset,shuffle=True)
 print(len(train_dataloader))
 for step,(input,label) in enumerate(train_dataloader):
     conv1 = nn.Conv2d(3,16,3)(input).detach()
