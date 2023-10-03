@@ -61,7 +61,7 @@ class GTSRB_NETWORK(nn.Module):
 
         self.flatten = nn.Flatten()
         
-        self.dropout = nn.Dropout(0.2)
+        self.dropout = nn.Dropout(0.4)
         self.dropout2D = nn.Dropout2d(0.2)
 
         self.relu = nn.ReLU()
@@ -218,13 +218,13 @@ class GTSRB_NETWORK(nn.Module):
          
 
     
-EPOCHS = 15
+EPOCHS = 100
 LEARNING_RATE = 0.001
 INPUT_DIM = 3*50*50
 OUTPUT_DIM = 43
 model = GTSRB_NETWORK(INPUT_DIM,OUTPUT_DIM).to(device)
 optimizer = Adam(params=model.parameters(),lr=LEARNING_RATE)
-lr_s = lr_scheduler.LinearLR(optimizer,start_factor=1.0,end_factor=0.007,total_iters=10)
+lr_s = lr_scheduler.LinearLR(optimizer,start_factor=1.0,end_factor=0.01,total_iters=30)
 loss = nn.CrossEntropyLoss()
 try:
     model.compile(train_data=train_loader,validation_data=validation_loader,epochs=EPOCHS,loss_function=loss,optimizer=optimizer,learning_rate_scheduler=lr_s)
