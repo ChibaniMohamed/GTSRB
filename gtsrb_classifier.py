@@ -3,7 +3,7 @@ import torch.nn as nn
 from GTSRB import GTSRB
 from torch.utils.data import DataLoader,random_split
 from torch.optim import Adam,lr_scheduler
-from torchvision.transforms import ToTensor,Resize,Compose,ColorJitter,RandomRotation,Pad,RandomCrop,GaussianBlur,AutoAugment
+from torchvision.transforms.v2 import ToTensor,Resize,Compose,ColorJitter,RandomRotation,Pad,RandomCrop,GaussianBlur,AutoAugment
 import matplotlib.pyplot as plt
 import pickle
 import tqdm
@@ -37,7 +37,7 @@ def train_test_split(dataset,train_size):
 
 
 dataset = GTSRB(root='./archive',split="train")
-train_set,validation_set = train_test_split(dataset,train_size=0.7)
+train_set,validation_set = train_test_split(dataset,train_size=0.8)
 
 train_set.dataset.transform = train_transforms
 validation_set.dataset.transform = validation_transforms
@@ -61,7 +61,8 @@ class GTSRB_NETWORK(nn.Module):
 
         self.flatten = nn.Flatten()
         
-        self.dropout = nn.Dropout(0.4)
+        self.dropout2 = nn.Dropout(0.2)
+        self.dropout3 = nn.Dropout(0.3)
         self.dropout2D = nn.Dropout2d(0.2)
 
         self.relu = nn.ReLU()
@@ -70,13 +71,13 @@ class GTSRB_NETWORK(nn.Module):
         self.maxpool = nn.MaxPool2d(2)
         self.avgpool = nn.AvgPool2d(3)
 
-        self.conv1 = nn.Conv2d(in_channels=3,out_channels=16,kernel_size=3)
-        self.conv2 = nn.Conv2d(in_channels=16,out_channels=24,kernel_size=3)
-        self.batchnorm1 = nn.BatchNorm2d(24)
+        self.conv1 = nn.Conv2d(in_channels=3,out_channels=32,kernel_size=3,padding=1)
+        self.conv2 = nn.Conv2d(in_channels=32,out_channels=64,kernel_size=3,padding=1)
+        self.batchnorm1 = nn.BatchNorm2d(64)
 
-        self.conv3 = nn.Conv2d(in_channels=24,out_channels=64,kernel_size=3)
-        self.conv4 = nn.Conv2d(in_channels=64,out_channels=128,kernel_size=3)
-        self.batchnorm2 = nn.BatchNorm2d(128)
+        self.conv3 = nn.Conv2d(in_channels=64,out_channels=128,kernel_size=3,padding=1)
+        self.conv4 = nn.Conv2d(in_channels=128,out_channels=256,kernel_size=3,padding=1)
+        self.batchnorm2 = nn.BatchNorm2d(256)
 
 
         '''
@@ -90,8 +91,8 @@ class GTSRB_NETWORK(nn.Module):
         '''
        
 
-        self.l1 = nn.Linear(128*9*9,245)
-        self.l2 = nn.Linear(245,128)
+        self.l1 = nn.Linear(256*12*12,512)
+        self.l2 = nn.Linear(512,128)
         self.batchnorm4 = nn.LayerNorm(128)
         self.l3 = nn.Linear(128,output_dim)
         
@@ -100,24 +101,25 @@ class GTSRB_NETWORK(nn.Module):
         
         conv = self.relu(self.conv1(input))
         conv = self.relu(self.conv2(conv))
-        maxpool = self.maxpool(conv)
-        batchnorm = self.batchnorm1(maxpool)
+        batchnorm = self.batchnorm1(conv)
+        maxpool = self.maxpool(batchnorm)
 
-        conv = self.relu(self.conv3(batchnorm))
+        conv = self.relu(self.conv3(maxpool))
         conv = self.relu(self.conv4(conv))
-        maxpool = self.maxpool(conv)
-        batchnorm = self.batchnorm2(maxpool)
+        batchnorm = self.batchnorm2(conv)
+        maxpool = self.maxpool(batchnorm)
 
         
 
+       
         
-        
-        flatten = self.flatten(batchnorm)
+        flatten = self.flatten(maxpool)
         
         dense_l1 = self.l1(flatten)
-        dense_l2 = self.l2(dense_l1)
+        dropout = self.dropout3(dense_l1)
+        dense_l2 = self.l2(dropout)
         batchnorm = self.batchnorm4(dense_l2)
-        dropout = self.dropout(batchnorm)
+        dropout = self.dropout2(batchnorm)
         output = self.l3(dropout)
         
        
