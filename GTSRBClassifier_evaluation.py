@@ -22,15 +22,15 @@ gtsrbClassifier = torch.jit.load('./models/gtsrb_model_final.pt').eval().to(devi
 
 with tqdm(colour='red',total=len(test_dataloader)) as progress:
   positives = 0
-  
+  total = 0
   with torch.no_grad() : 
-    for id,(input,label) in enumerate(iter(test_dataloader),start=1):
+    for id,(input,label) in enumerate(iter(test_dataloader)):
         input = input.to(device)
         label = label.to(device)
-        prediction = gtsrbClassifier.forward(input).argmax(1).cpu().numpy()[0]
-        label = label.cpu().numpy()
-        if label == prediction:
-            positives += 1
+        prediction = gtsrbClassifier.forward(input)
+        _,predicted = torch.max(prediction,1)
+        positives += (predicted == label).sum().item()
+        total += 1
         '''
         else:
            input = input[0].permute(1,2,0).cpu()
@@ -39,7 +39,7 @@ with tqdm(colour='red',total=len(test_dataloader)) as progress:
            plt.show()
         '''
         progress.update(1)
-        progress.desc = f"Accuracy : {positives/id}, Positives : {positives}, Negatives : {id-positives}"
+        progress.desc = f"Accuracy : {positives/total}, Positives : {positives}, Negatives : {id-positives}"
        
 
 '''

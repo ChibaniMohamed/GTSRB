@@ -3,12 +3,12 @@ import torch.nn as nn
 from GTSRB import GTSRB
 from torch.utils.data import DataLoader,random_split
 from torch.optim import Adam,lr_scheduler
-from torchvision.transforms.v2 import ToTensor,Resize,Compose,ColorJitter,RandomRotation,Pad,RandomCrop,GaussianBlur,AutoAugment
+from torchvision.transforms.v2 import ToTensor,Resize,Compose,ColorJitter,RandomRotation,Pad,RandomCrop,GaussianBlur,AutoAugment,RandomHorizontalFlip,RandomVerticalFlip
 import matplotlib.pyplot as plt
 import pickle
 import tqdm
 BATCH_SIZE = 64
-device = torch.device('cuda' if torch.cuda.is_available else 'cpu')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 '''
     GaussianBlur((3,3)),
@@ -17,7 +17,11 @@ device = torch.device('cuda' if torch.cuda.is_available else 'cpu')
     ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.2),
 '''
 train_transforms = Compose([
-    AutoAugment(),
+    RandomHorizontalFlip(0.3),
+    RandomVerticalFlip(0.3),
+    GaussianBlur((3,3)),
+    RandomRotation(30),
+    ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.2),
 
     Resize([50,50]),
     ToTensor(),
@@ -125,27 +129,28 @@ class GTSRB_NETWORK(nn.Module):
        
         return output
     
-    def training_metrics(self,positives,loss):
-        data_size = len(train_loader)
+    def training_metrics(self,positives,data_size,loss):
         acc = positives/data_size
         return loss,acc
     
     def validation_metrics(self,validation_data,loss_function):
        data_size = len(validation_data)
-       positives = 0
+       correct_predictions = 0
+       total_samples = 0
        val_loss = 0
 
        model = self.eval()
        with torch.no_grad() : 
-        for step,(input,label) in enumerate(validation_data,start=1):
+        for step,(input,label) in enumerate(validation_data):
             input,label = input.to(device),label.to(device)
             prediction = model.forward(input)
             loss = loss_function(prediction,label)
             val_loss = loss.item()
-            if prediction.argmax(1)[0] == label[0] :
-                positives += 1
-       
-       val_acc = positives/data_size
+            _,predicted = torch.max(prediction,1)
+            correct_predictions += (predicted == label).sum().item()
+            total_samples += label.size(0)
+
+       val_acc = correct_predictions/total_samples
 
        return val_loss,val_acc
 
@@ -171,18 +176,19 @@ class GTSRB_NETWORK(nn.Module):
         for epoch in range(epochs):
             lr = optimizer.param_groups[0]["lr"]
             learning_rate_list.append(lr)
-            positives = 0
+            correct_predictions = 0
+            total_examples = 0
             loss = 0
             with tqdm.trange(STEPS) as STEPS_:
 
-                for step,(input,label) in enumerate(train_loader,start=1):
+                for step,(input,label) in enumerate(train_loader):
 
                     input,label = input.to(device),label.to(device)
                     prediction = self.forward(input)
 
-                    if prediction.argmax(1)[0] == label[0] :
-                        positives += 1
-
+                    _, predicted = torch.max(prediction, 1)
+                    correct_predictions += (predicted == label).sum().item()
+                    total_examples += label.size(0)
                     l = loss_function(prediction,label)
                     loss = l.item()
                     l.backward()
@@ -190,10 +196,10 @@ class GTSRB_NETWORK(nn.Module):
                     optimizer.zero_grad()
 
                     STEPS_.colour = 'green'
-                    STEPS_.desc = f'Epoch [{epoch}/{EPOCHS}], Step [{step}/{STEPS}], Learning Rate [{lr}], Loss [{"{:.4f}".format(l)}], Accuracy [{"{:.4f}".format(positives/step)}]'
+                    STEPS_.desc = f'Epoch [{epoch}/{EPOCHS}], Step [{step}/{STEPS}], Learning Rate [{lr}], Loss [{"{:.4f}".format(l)}], Accuracy [{"{:.4f}".format(correct_predictions/total_examples)}]'
                     STEPS_.update(1)
 
-            training_loss,training_acc = self.training_metrics(positives,loss)
+            training_loss,training_acc = self.training_metrics(correct_predictions,total_examples,loss)
             train_acc_list.append(training_acc)
             train_loss_list.append(training_loss)
 
@@ -221,12 +227,12 @@ class GTSRB_NETWORK(nn.Module):
 
     
 EPOCHS = 100
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.0008
 INPUT_DIM = 3*50*50
 OUTPUT_DIM = 43
 model = GTSRB_NETWORK(INPUT_DIM,OUTPUT_DIM).to(device)
 optimizer = Adam(params=model.parameters(),lr=LEARNING_RATE)
-lr_s = lr_scheduler.LinearLR(optimizer,start_factor=1.0,end_factor=0.01,total_iters=30)
+lr_s = lr_scheduler.LinearLR(optimizer,start_factor=1.0,end_factor=1,total_iters=30)
 loss = nn.CrossEntropyLoss()
 try:
     model.compile(train_data=train_loader,validation_data=validation_loader,epochs=EPOCHS,loss_function=loss,optimizer=optimizer,learning_rate_scheduler=lr_s)
