@@ -3,7 +3,7 @@ import torch.nn as nn
 from GTSRB import GTSRB
 from torch.utils.data import DataLoader,random_split
 from torch.optim import Adam,lr_scheduler
-from torchvision.transforms.v2 import ToTensor,Resize,Compose,ColorJitter,RandomRotation,Pad,RandomCrop,GaussianBlur,AutoAugment,RandomHorizontalFlip,RandomVerticalFlip
+from torchvision.transforms.v2 import ToTensor,Resize,Compose,ColorJitter,RandomRotation,AugMix,RandomCrop,GaussianBlur,RandomEqualize,RandomHorizontalFlip,RandomVerticalFlip
 import matplotlib.pyplot as plt
 import pickle
 import tqdm
@@ -17,11 +17,13 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.2),
 '''
 train_transforms = Compose([
+    ColorJitter(brightness=1.0, contrast=0.5, saturation=1, hue=0.1),
+    RandomEqualize(0.4),
+    AugMix(),
     RandomHorizontalFlip(0.3),
     RandomVerticalFlip(0.3),
     GaussianBlur((3,3)),
     RandomRotation(30),
-    ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.2),
 
     Resize([50,50]),
     ToTensor(),
@@ -84,10 +86,11 @@ class GTSRB_NETWORK(nn.Module):
         self.batchnorm2 = nn.BatchNorm2d(256)
 
 
+        
+        self.conv5 = nn.Conv2d(in_channels=256,out_channels=512,kernel_size=3)
+        self.batchnorm3 = nn.BatchNorm2d(512)
+    
         '''
-        self.conv5 = nn.Conv2d(in_channels=128,out_channels=245,kernel_size=3)
-        self.conv6 = nn.Conv2d(in_channels=245,out_channels=450,kernel_size=3)
-        self.batchnorm3 = nn.BatchNorm2d(450)
         self.conv7 =  nn.Conv2d(in_channels=16,out_channels=64,kernel_size=3)
         self.conv8 = nn.Conv2d(in_channels=64,out_channels=128,kernel_size=3)
         self.maxpool2 = nn.MaxPool2d(2)
@@ -95,7 +98,7 @@ class GTSRB_NETWORK(nn.Module):
         '''
        
 
-        self.l1 = nn.Linear(256*12*12,512)
+        self.l1 = nn.Linear(512*5*5,512)
         self.l2 = nn.Linear(512,128)
         self.batchnorm4 = nn.LayerNorm(128)
         self.l3 = nn.Linear(128,output_dim)
@@ -103,18 +106,21 @@ class GTSRB_NETWORK(nn.Module):
         
     def forward(self,input):
         
-        conv = self.relu(self.conv1(input))
-        conv = self.relu(self.conv2(conv))
-        batchnorm = self.batchnorm1(conv)
+        conv = self.conv1(input)
+        conv = self.conv2(conv)
+        batchnorm = self.relu(self.batchnorm1(conv))
         maxpool = self.maxpool(batchnorm)
 
-        conv = self.relu(self.conv3(maxpool))
-        conv = self.relu(self.conv4(conv))
-        batchnorm = self.batchnorm2(conv)
+        conv = self.conv3(maxpool)
+        conv = self.conv4(conv)
+        batchnorm = self.relu(self.batchnorm2(conv))
         maxpool = self.maxpool(batchnorm)
 
+        conv = self.conv5(maxpool)
+        batchnorm = self.relu(self.batchnorm3(conv))
+        maxpool = self.maxpool(batchnorm)
         
-
+        
        
         
         flatten = self.flatten(maxpool)
@@ -226,13 +232,13 @@ class GTSRB_NETWORK(nn.Module):
          
 
     
-EPOCHS = 100
+EPOCHS = 20
 LEARNING_RATE = 0.0008
 INPUT_DIM = 3*50*50
 OUTPUT_DIM = 43
 model = GTSRB_NETWORK(INPUT_DIM,OUTPUT_DIM).to(device)
 optimizer = Adam(params=model.parameters(),lr=LEARNING_RATE)
-lr_s = lr_scheduler.LinearLR(optimizer,start_factor=1.0,end_factor=1,total_iters=30)
+lr_s = lr_scheduler.LinearLR(optimizer,start_factor=1.0,end_factor=0.08,total_iters=5)
 loss = nn.CrossEntropyLoss()
 try:
     model.compile(train_data=train_loader,validation_data=validation_loader,epochs=EPOCHS,loss_function=loss,optimizer=optimizer,learning_rate_scheduler=lr_s)

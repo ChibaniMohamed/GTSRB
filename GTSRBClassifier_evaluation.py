@@ -1,12 +1,13 @@
 import torch
 from GTSRB import GTSRB
-from torchvision.transforms import Resize,ToTensor,Compose,Normalize,RandomAutocontrast,RandomRotation,GaussianBlur,ColorJitter
+from torchvision.transforms import Resize,ToTensor,Compose,RandomVerticalFlip,RandomHorizontalFlip,RandomRotation,GaussianBlur,ColorJitter
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from PIL import Image
+import numpy as np
 
 transforms = Compose([
-   
     Resize([50,50]),
     ToTensor(),
     
@@ -31,20 +32,15 @@ with tqdm(colour='red',total=len(test_dataloader)) as progress:
         _,predicted = torch.max(prediction,1)
         positives += (predicted == label).sum().item()
         total += 1
-        '''
-        else:
-           input = input[0].permute(1,2,0).cpu()
-           plt.title(f'prediction : {prediction}, truth : {label[0]}')
-           plt.imshow(input)
-           plt.show()
-        '''
+        
+        if predicted != label :
+           input = ((input.cpu().squeeze().permute(1,2,0).numpy() + 1 )/2) * 255
+           Image.fromarray(input.astype(np.uint8)).save(f'./false_prediction/{label.item()}-{id}.jpg')
+        
         progress.update(1)
         progress.desc = f"Accuracy : {positives/total}, Positives : {positives}, Negatives : {id-positives}"
        
 
-'''
-    input = input.cpu()
-    plt.title(f'prediction : {prediction} | ground truth : {label[0]}')
-    plt.imshow(input[0].permute(1,2,0))
-    plt.show()
-    '''
+
+  
+   
