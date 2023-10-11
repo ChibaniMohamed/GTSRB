@@ -88,7 +88,8 @@ class GTSRB_NETWORK(nn.Module):
 
         
         self.conv5 = nn.Conv2d(in_channels=256,out_channels=512,kernel_size=3)
-        self.batchnorm3 = nn.BatchNorm2d(512)
+        self.conv6 = nn.Conv2d(in_channels=512,out_channels=1024,kernel_size=3)
+        self.batchnorm3 = nn.BatchNorm2d(1024)
     
         '''
         self.conv7 =  nn.Conv2d(in_channels=16,out_channels=64,kernel_size=3)
@@ -98,7 +99,7 @@ class GTSRB_NETWORK(nn.Module):
         '''
        
 
-        self.l1 = nn.Linear(512*5*5,512)
+        self.l1 = nn.Linear(1024*4*4,512)
         self.l2 = nn.Linear(512,128)
         self.batchnorm4 = nn.LayerNorm(128)
         self.l3 = nn.Linear(128,output_dim)
@@ -117,6 +118,7 @@ class GTSRB_NETWORK(nn.Module):
         maxpool = self.maxpool(batchnorm)
 
         conv = self.conv5(maxpool)
+        conv = self.conv6(conv)
         batchnorm = self.relu(self.batchnorm3(conv))
         maxpool = self.maxpool(batchnorm)
         
@@ -232,13 +234,13 @@ class GTSRB_NETWORK(nn.Module):
          
 
     
-EPOCHS = 20
-LEARNING_RATE = 0.0008
+EPOCHS = 30
+LEARNING_RATE = 0.001
 INPUT_DIM = 3*50*50
 OUTPUT_DIM = 43
 model = GTSRB_NETWORK(INPUT_DIM,OUTPUT_DIM).to(device)
 optimizer = Adam(params=model.parameters(),lr=LEARNING_RATE)
-lr_s = lr_scheduler.LinearLR(optimizer,start_factor=1.0,end_factor=0.08,total_iters=5)
+lr_s = lr_scheduler.LinearLR(optimizer,start_factor=1.0,end_factor=0.3,total_iters=5)
 loss = nn.CrossEntropyLoss()
 try:
     model.compile(train_data=train_loader,validation_data=validation_loader,epochs=EPOCHS,loss_function=loss,optimizer=optimizer,learning_rate_scheduler=lr_s)
